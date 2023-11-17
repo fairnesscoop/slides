@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Découverte des Web Components</title>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: serif;
+      font-weight: normal;
+    }
+
+    blockquote {
+      margin: 0;
+      padding-left: 1ch;
+      border-left: 4px solid lightgrey;
+      font-style: italic;
+    }
+
+    .remark-code,
+    .remark-inline-code {
+      font-family: 'Ubuntu Mono', monospace;
+    }
+
+    li:not(:last-child) {
+      padding-bottom: 0.4rem;
+    }
+  </style>
+</head>
+
+<body>
+  <textarea id="source">
+
+class: center, middle
+
+# Découverte des Web Components
+
+Fairness, 17/11/2023
+
+---
+
+class: center, middle
+
+## C'est quoi les Web Components ?
+
+---
+
+## Définition MDN
+
+https://developer.mozilla.org/fr/docs/Web/API/Web_Components
+
+"Web Components" regroupe 3 technologies :
+
+* Custom elements
+* Shadow DOM
+* Templates HTML : `<template>`, `<slot>`
+
+---
+
+## Ils sont faits pour durer
+
+**Standard W3C**, comme HTML, CSS, ECMAScript...
+
+https://jakelazaroff.com/words/web-components-will-outlive-your-javascript-framework/
+
+> There’s a cost to using dependencies. New versions are released, APIs change, and it takes time and effort to make sure your own code remains compatible with them
+>
+> [...] As the ecosystem around it swirled, **the web platform itself remained remarkably stable**.
+>
+> [...] If we want our work to be accessible in five or ten or even 20 years, we need to **use the web with no layers in between**.
+
+C'est leur **argument massue** par rapport aux frameworks JS.
+
+---
+
+## _Étendre_ HTML
+
+Et pas le remplacer !
+
+> Web Components **fill in the blanks of what we can do with hypertext**: they’re really just small, reusable chunks of code that extends the language of HTML. ([source](https://buttondown.email/cascade/archive/005-why-web-components/
+))
+
+```html
+<two-up>
+  <div><h1>The Dark Side</h1></div>
+  <div><h1>The Light Side</h1></div>
+</two-up>
+```
+
+<a title="Ouvrir le CodePen pour two-up" href="https://codepen.io/developit/pen/qBdbNLK?utm_source=cascade&utm_medium=email&utm_campaign=005-why-web-components">
+  <img width="400px" src="https://buttondown-attachments.s3.us-west-2.amazonaws.com/images/ef0728eb-82fd-4ba6-9e4f-dd7f60343816.gif?w=960&fit=max">
+</a>
+
+---
+
+class: center, middle
+
+## Et concrètement ?
+
+---
+
+## Custom elements
+
+https://developer.mozilla.org/fr/docs/Web/API/Web_components/Using_custom_elements
+
+Exemple : [intégration `EventCalendar` dans Permacoop](https://github.com/fairnesscoop/permacoop/blob/e96716bf212e795c37139352bf3f0a55b65e6ab7/src/assets/customElements/eventCalendar.js)
+
+```twig
+<event-calendar data-events-json="{{ events|dump }}"></event-calendar>
+```
+
+```js
+import Calendar from '@event-calendar/core';
+
+class EventCalendar extends HTMLElement {
+  connectedCallback() {
+    // ...
+    const events = JSON.parse(this.dataset.eventsJson);
+    // ...
+
+    const ec = new Calendar({
+      target: this,
+      // ...
+    });
+  }
+}
+
+customElements.define('event-calendar', EventCalendar);
+```
+
+---
+
+## Customized built-in elements (`is="..."`)
+
+https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements
+
+Exemple : [formulaire avec soumission automatique dans Permacoop](https://github.com/fairnesscoop/permacoop/blob/86cd17976523597042383bf7304f9458cbaee3f3/src/assets/customElements/autoForm.js)
+
+```html
+<form is="auto-form" action="/filters" method="POST">
+  <label for="project">Projet</label>
+  <select id="project" name="project">
+    <option value="id1">Projet 1</option>
+  </select>
+</form>
+```
+
+```js
+class AutoForm extends HTMLFormElement {
+  connectedCallback() {
+    for (const formControl of this) {
+      formControl.addEventListener('change', () => this.requestSubmit());
+    }
+  }
+}
+
+customElements.define('auto-form', AutoForm, {extends: 'form'});
+```
+
+---
+
+## Cycle de vie (_Lifecycle_)
+
+https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks
+
+```js
+class MyCustomElement extends HTMLElement {
+  static observedAttributes = ["color", "size"];
+
+  connectedCallback() {
+    console.log("Custom element added to page.");
+  }
+  
+  attributeChangedCallback(name, oldValue, newValue) {
+    console.log(`Attribute ${name} has changed.`);
+  }
+
+  disconnectedCallback() {
+    console.log("Custom element removed from page.");
+  }
+}
+```
+
+En pratique **connectedCallback()** suffit souvent. Les _event listeners_ ajoutés à l'intérieur d'un `HTMLElement` sont automatiquement retirés ✅
+
+---
+
+
+## Les custom elements permettent déjà d'aller loin
+
+https://meyerweb.com/eric/thoughts/2023/11/01/blinded-by-the-light-dom/
+
+> You just take some normal HTML markup, wrap it with a custom element, and then write some JS to add capabilities which you can then style with regular CSS!  
+
+---
+
+## Les custom elements permettent déjà d'aller loin (suite)
+
+```html
+<super-slider unit="em" target=".preview h1">
+  <label for="title-size">Title font size</label>
+  <input id="title-size" type="range" min="0.5" max="4" step="0.1" value="2" />
+</super-slider>
+```
+
+```js
+class SuperSlider extends HTMLElement {
+  connectedCallback() {
+    const targetEl = document.querySelector(this.getAttribute('target'));
+    const unit = this.getAttribute('unit');
+    const slider = this.querySelector('input[type="range"]');
+    slider.addEventListener('input', () => {
+      targetEl.style.setProperty('font-size', slider.value + unit);
+    });
+  }
+}
+
+customElements.define('super-slider', SuperSlider);
+```
+
+[CodePen](https://codepen.io/meyerweb/pen/oNmXJRX)
+
+---
+
+## Avantages et limitations des custom elements seuls
+
+Avantages
+
+* Le JS et les listeners sont associés à un élément (!= JS global)
+* Peut suffire dans bien des cas, y compris pour remplacer [Stimulus](https://stimulus.hotwired.dev/)
+* Encourage le _Progressive enhancement_ : écrire du HTML qui fonctionne même sans le Custom element
+
+Limitations
+
+* Styles à définir dans le CSS global (OK si pas besoin de portabilité)
+* Pas de templating du HTML
+
+```css
+/* assets/main.css */
+super-slide {
+  color: blue;
+}
+```
+
+---
+
+class: center, middle
+
+## Le Shadow DOM
+
+_Le quoi ??_
+
+---
+
+## Le Shadow DOM
+
+https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM
+
+Permet de manipuler des éléments "cachés" derrière un élément hôte
+
+Exemple : l'élément `<video>`, qui cache les boutons de lecture, volume, etc.
+
+[What is Shadow DOM and should we be using it? (Reddit)](https://www.reddit.com/r/webdev/comments/e6b3d3/eli5_what_is_a_shadow_dom_and_should_we_be_using/)
+
+---
+
+## Le Shadow DOM (suite)
+
+Schéma typique :
+
+<img width="800px" src="https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM/shadowdom.svg">
+
+---
+
+## Utilisation fondamentale du Shadow DOM
+
+```html
+<div id="host"></div>
+```
+
+```js
+const host = document.querySelector("#host");
+const shadow = host.attachShadow({ mode: "open" });
+const span = document.createElement("span");
+span.textContent = "I'm in the shadow DOM";
+shadow.appendChild(span);
+```
+
+Résultat
+
+```html
+<div id="host">
+  #shadow-root (open)
+  <span>I'm in the shadow DOM</span>
+</div>
+```
+
+[CodePen](https://codepen.io/fm_fairness/pen/qBgpmRM?editors=1010)
+
+---
+
+## Shadow DOM : exemple avancé
+
+edit-word : [code](https://github.com/mdn/web-components-examples/blob/main/edit-word/main.js), [demo](https://mdn.github.io/web-components-examples/edit-word/)
+
+```html
+<p>My name is <edit-word>Chris</edit-word>, the man said.</p>
+```
+
+---
+
+## Le Shadow DOM pour quoi faire ?
+
+Hot take : la [doc MDN](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM) dit que "l'encapsulation" est un aspect important du Shadow DOM.
+
+C'est vrai, mais source de confusion ! [Les styles extérieurs ont priorité sur les styles du Shadow DOM](https://shadowdom.style/)
+
+Les vrais intérêts du Shadow DOM selon moi (par rapport aux seuls Custom elements) :
+
+* Ajouter des éléments interactifs qui _améliorent_ une expérience qui reste fonctionnelle sans eux (_Progressive enhancement_)
+* Commander le placement des éléments avec `<slot>` (templating)
+
+https://knowler.dev/blog/extensible-web-components
+
+---
+
+## Inconvénients du Shadow DOM
+
+* Peut être verbeux : 
+
+---
+
+## Declarative Shadow DOM
+
+```html
+<button>Test</button>
+
+<my-stuff>
+  <template shadowrootmode="open">
+    <style>
+      button {
+        background-color: green;
+      }
+    </style>
+    <slot></slot>
+  </template>
+  <button></button>
+</my-stuff>
+```
+
+Si on ajoute ce CSS global, le bouton deviendra rose aussi !
+
+```html
+<style>
+  button {
+    background-color: pink;
+  }
+</style>
+```
+
+Voir https://shadowdom.style/
+
+---
+
+## (Declarative) Shadow DOM : exemple
+
+Business Dashboard ([demo](https://dashboard-exercise-css-nouveau.onrender.com/), [repo](https://github.com/thespicyweb/dashboard-exercise-css-nouveau), [article](https://www.spicyweb.dev/css-nouveau/1-vanilla-has-never-tasted-so-hot/10-final-exercise-building-a-business-app-ui/))
+
+---
+
+## Comparaison avec React & co
+
+La philosophie des Web Components n'est pas celle des frameworks JS (React, Svelte, Vue...)
+
+https://blog.jim-nielsen.com/2023/html-web-components/
+
+> “Web components” sounded like the web platform's equivalent to “React components”. 
+> 
+> But [...] web components don't work like React components.
+>
+> Web components [...] [favor] **enhancement over replacement**.
+
+https://ruby.social/@camertron/111394226590861903
+
+> React is anti-web
+
+https://knowler.dev/blog/extensible-web-components
+
+> **Extensibility is an underlying principle of the web. Web Components do not deviate from this principle.**
+> [...] Our approach to Web Components should be one that is **open by default**.
+> [...] I think in practice this means adopting approaches like **progressive enhancement**. 
+
+---
+
+## Comparaison avec React & co (suite)
+
+Approche React : **remplace** le HTML existant
+
+```html
+<UserAvatar src="https://example.com/path/to/img.jpg" alt="..." />
+```
+
+Approche Web Components : **étend** du HTML existant
+
+```html
+<user-avatar>
+  <img src="https://example.com/path/to/img.jpg" alt="..." />
+</user-avatar>
+```
+
+Un Web Component qui inclut du HTML fonctionnel sans lui peut être appelé ["HTML Web Component"](https://blog.jim-nielsen.com/2023/html-web-components/.)
+
+---
+
+## Support navigateur
+
+https://caniuse.com/?search=WebComponents
+
+---
+
+## Écoconception ? Accessibilité ?
+
+Quelques hypothèses...
+
+Ecoconception :
+
+* Les Web Components sont _a priori_ plus léger (rien d'autre que le navigateur)
+* Exemple : [Business Dashboard](https://dashboard-exercise-css-nouveau.onrender.com/), 101 ko de JS/CSS
+
+Accessibilité :
+
+* _A priori_ pas d'avantage ni d'inconvénient, il faut faire le même travail 
+
+---
+
+## Suites
+
+À explorer :
+
+* Implémenter d'autres cas pour Custom Elements + Shadow DOM
+* Le [Declarative Shadow DOM](https://developer.chrome.com/articles/declarative-shadow-dom/) (`<template shadowrootmode="open">`)
+* Wrappers qui améliorent la DX : [Lit](https://lit.dev/docs/api/LitElement/), [Enhance](https://enhance.dev/), [WebC](https://github.com/11ty/webc)...
+  * Semblent trop _JavaScript-centric_... Sauf peut-être WebC
+* Styling à l'intérieur du Shadow DOM : `::part`, `::slotted`
+
+---
+
+## Références
+
+Documentation
+
+* [Web Components](https://developer.mozilla.org/en-US/docs/Web/API/Web_Components), MDN Web Docs
+
+Billets
+
+* [HTML Web Components](https://blog.jim-nielsen.com/2023/html-web-components/), Jim Nielsen, 2023-11-13
+* [Extensible web components](https://knowler.dev/blog/extensible-web-components), Nathan Knowler, 2023-11-11
+* [HTML web components](https://adactio.com/journal/20618), adactio, 2023-11-09
+* [Blinded by the Light DOM](https://meyerweb.com/eric/thoughts/2023/11/01/blinded-by-the-light-dom/), Eric Meyer, 2023-11-01
+* [Web components will outlive your JavaScript frameworks](https://jakelazaroff.com/words/web-components-will-outlive-your-javascript-framework/), Jake Lazaroff, 2023-10-25
+* [HTML with superpowers](https://daverupert.com/2021/10/html-with-superpowers/), Dave Rupert, 2021-10-18
+
+Exemples
+
+* Business Dashboard ([demo](https://dashboard-exercise-css-nouveau.onrender.com/), [repo](https://github.com/thespicyweb/dashboard-exercise-css-nouveau), [article](https://www.spicyweb.dev/css-nouveau/1-vanilla-has-never-tasted-so-hot/10-final-exercise-building-a-business-app-ui/)) : approche composants avec Declarative Shadow DOM (DSD)
+* [mdn/web-components-examples](https://github.com/mdn/web-components-examples/)
+
+    </textarea>
+  <script src="https://remarkjs.com/downloads/remark-latest.min.js">
+  </script>
+  <script>
+    remark.create();
+  </script>
+  <script>
+    customElements.define('edit-word',
+      class extends HTMLElement {
+        constructor() {
+          super();
+
+          const shadowRoot = this.attachShadow({ mode: 'open' });
+          const form = document.createElement('form');
+          const input = document.createElement('input');
+          const span = document.createElement('span');
+
+          const style = document.createElement('style');
+          style.textContent = 'span { background-color: #eef; padding: 0 2px }';
+
+          shadowRoot.appendChild(style);
+          shadowRoot.appendChild(form);
+          shadowRoot.appendChild(span);
+
+          span.textContent = this.textContent;
+          input.value = this.textContent;
+
+          form.appendChild(input);
+          form.style.display = 'none';
+          span.style.display = 'inline-block';
+          input.style.width = span.clientWidth + 'px';
+
+          this.setAttribute('tabindex', '0');
+          input.setAttribute('required', 'required');
+          this.style.display = 'inline-block';
+
+          this.addEventListener('click', () => {
+            span.style.display = 'none';
+            form.style.display = 'inline-block';
+            input.focus();
+            input.setSelectionRange(0, input.value.length)
+          });
+
+          form.addEventListener('submit', e => {
+            updateDisplay();
+            e.preventDefault();
+          });
+
+          input.addEventListener('blur', updateDisplay);
+
+          function updateDisplay() {
+            span.style.display = 'inline-block';
+            form.style.display = 'none';
+            span.textContent = input.value;
+            input.style.width = span.clientWidth + 'px';
+          }
+        }
+      }
+    );
+  </script>
+</body>
+
+</html>
