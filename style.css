@@ -1,0 +1,28 @@
+/* styles.css */
+
+body {
+  font-family: sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: serif;
+  font-weight: normal;
+}
+
+blockquote {
+  margin: 0;
+  padding-left: 1ch;
+  border-left: 4px solid lightgrey;
+  font-style: italic;
+}
+
+.remark-code,
+.remark-inline-code {
+  font-family: 'Ubuntu Mono', monospace;
+}
+
+li:not(:last-child) {
+  padding-bottom: 0.4rem;
+}
